@@ -27,6 +27,10 @@ enum Timings {
 
 #[derive(Debug)]
 pub struct WgpuStream {
+    /// Bind groups are cached by (pipeline, bindings): decode-style workloads
+    /// re-dispatch identical tuples thousands of times per second, and
+    /// `create_bind_group` is several µs of per-dispatch CPU cost.
+    bind_groups: std::collections::HashMap<(usize, Vec<(wgpu::Buffer, u64, u64)>), wgpu::BindGroup>,
     pub mem_manage: WgpuMemManager,
     pub device: wgpu::Device,
     pub errors: Vec<ServerError>,
@@ -75,6 +79,7 @@ impl WgpuStream {
             WgpuMemManager::new(device.clone(), memory_properties, memory_config, logger);
 
         Self {
+            bind_groups: std::collections::HashMap::new(),
             mem_manage,
             compute_pass: None,
             timings,
@@ -531,13 +536,7 @@ impl WgpuStream {
             return;
         }
 
-        let entries = resources
-            .enumerate()
-            .map(|(i, r)| wgpu::BindGroupEntry {
-                binding: i as u32,
-                resource: r.as_wgpu_bind_resource(),
-            })
-            .collect::<Vec<_>>();
+        let res: Vec<&WgpuResource> = resources.collect();
 
         // Start a new compute pass if needed. The forget_lifetime allows
         // to store this with a 'static lifetime, but the compute pass must
@@ -564,12 +563,36 @@ impl WgpuStream {
 
         self.tasks_count += 1;
 
-        let group_layout = pipeline.get_bind_group_layout(0);
-        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: None,
-            layout: &group_layout,
-            entries: &entries,
-        });
+        let key = (
+            Arc::as_ptr(&pipeline) as usize,
+            res.iter()
+                .map(|r| (r.buffer.clone(), r.offset, r.size))
+                .collect::<Vec<_>>(),
+        );
+        if self.bind_groups.len() > 8192 {
+            self.bind_groups.clear();
+        }
+        let device = &self.device;
+        let bind_group = self
+            .bind_groups
+            .entry(key)
+            .or_insert_with(|| {
+                let entries = res
+                    .iter()
+                    .enumerate()
+                    .map(|(i, r)| wgpu::BindGroupEntry {
+                        binding: i as u32,
+                        resource: r.as_wgpu_bind_resource(),
+                    })
+                    .collect::<Vec<_>>();
+                let group_layout = pipeline.get_bind_group_layout(0);
+                device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: None,
+                    layout: &group_layout,
+                    entries: &entries,
+                })
+            })
+            .clone();
 
         pass.set_pipeline(&pipeline);
         pass.set_bind_group(0, &bind_group, &[]);
