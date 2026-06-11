@@ -252,6 +252,7 @@ pub enum Instruction<D: Dialect> {
     Normalize(UnaryInstruction<D>),
     FastNormalize(UnaryInstruction<D>),
     Dot(BinaryInstruction<D>),
+    Dot4I8Packed(BinaryInstruction<D>),
     VectorSum(UnaryInstruction<D>),
     Copy {
         input: Variable<D>,
@@ -671,6 +672,9 @@ for ({i_ty} {i} = {start}; {i} {cmp} {end}; {increment}) {{
                 Magnitude::<D, FastSqrt>::format(f, &inst.input, &inst.out)
             }
             Instruction::Dot(inst) => Dot::format(f, &inst.lhs, &inst.rhs, &inst.out),
+            Instruction::Dot4I8Packed(inst) => {
+                Dot4I8Packed::format(f, &inst.lhs, &inst.rhs, &inst.out)
+            }
             Instruction::VectorSum(inst) => VectorSumFmt::<D>::format(f, &inst.input, &inst.out),
             Instruction::VecInit { inputs, out } => {
                 let item = out.item();
@@ -1076,6 +1080,35 @@ impl<D: Dialect> Dot<D> {
 
         let out = out.fmt_left();
         writeln!(f, "{out} = {};", muls.join(" + "))
+    }
+}
+
+struct Dot4I8Packed<D: Dialect> {
+    _dialect: PhantomData<D>,
+}
+
+impl<D: Dialect> Dot4I8Packed<D> {
+    fn lane(value: &Variable<D>, lane: usize) -> String {
+        let shift = lane * 8;
+        format!("(int32(({value} >> {shift}) & 0x7fu) - int32(({value} >> {shift}) & 0x80u))")
+    }
+
+    fn format(
+        f: &mut core::fmt::Formatter<'_>,
+        lhs: &Variable<D>,
+        rhs: &Variable<D>,
+        out: &Variable<D>,
+    ) -> core::fmt::Result {
+        let products = (0..4)
+            .map(|i| {
+                let lhs_i = Self::lane(lhs, i);
+                let rhs_i = Self::lane(rhs, i);
+                format!("({lhs_i} * {rhs_i})")
+            })
+            .collect::<Vec<_>>();
+
+        let out = out.fmt_left();
+        writeln!(f, "{out} = {};", products.join(" + "))
     }
 }
 

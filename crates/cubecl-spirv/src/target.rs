@@ -131,6 +131,13 @@ impl SpirvTarget for GLCompute {
             b.extension("SPV_KHR_float_controls2");
         }
 
+        if version < (1, 6)
+            && (caps.contains(&Capability::DotProduct)
+                || caps.contains(&Capability::DotProductInput4x8BitPacked))
+        {
+            b.extension("SPV_KHR_integer_dot_product");
+        }
+
         if b.debug_symbols {
             b.extension("SPV_KHR_non_semantic_info");
         }

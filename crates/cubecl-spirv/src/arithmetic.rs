@@ -4,7 +4,7 @@ use crate::{
     variable::ConstVal,
 };
 use cubecl_core::ir::{self as core, Arithmetic, InstructionModes};
-use rspirv::spirv::{Capability, Decoration, FPEncoding};
+use rspirv::spirv::{Capability, Decoration, FPEncoding, PackedVectorFormat};
 
 impl<T: SpirvTarget> SpirvCompiler<T> {
     pub fn compile_arithmetic(
@@ -151,6 +151,32 @@ impl<T: SpirvTarget> SpirvCompiler<T> {
                         _ => unreachable!(),
                     };
                 });
+            }
+            Arithmetic::Dot4I8Packed(op) => {
+                let lhs = self.compile_variable(op.lhs);
+                let rhs = self.compile_variable(op.rhs);
+                let out = self.compile_variable(out);
+                let packed_ty = Item::Scalar(Elem::Int(32, false));
+
+                let lhs_id = self.read_as(&lhs, &packed_ty);
+                let rhs_id = self.read_as(&rhs, &packed_ty);
+                let out_id = self.write_id(&out);
+                self.mark_uniformity(out_id, uniform);
+
+                self.capabilities.insert(Capability::DotProduct);
+                self.capabilities
+                    .insert(Capability::DotProductInput4x8BitPacked);
+
+                let ty = out.item().id(self);
+                self.s_dot(
+                    ty,
+                    Some(out_id),
+                    lhs_id,
+                    rhs_id,
+                    Some(PackedVectorFormat::PackedVectorFormat4x8Bit),
+                )
+                .unwrap();
+                self.write(&out, out_id);
             }
             Arithmetic::Dot(op) => {
                 if op.lhs.ty.vector_size() == 1 {

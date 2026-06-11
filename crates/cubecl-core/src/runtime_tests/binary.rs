@@ -53,7 +53,7 @@ expected: {:?}",
 
 // Needs lazy because const trait fns aren't stable
 static FAST_MATH: Lazy<EnumSet<FastMath>> =
-    Lazy::new(|| FastMath::all().difference(FastMath::NotNaN));
+    Lazy::new(|| FastMath::all().difference(FastMath::NotNaN.into()));
 
 macro_rules! test_binary_impl {
     (
@@ -397,6 +397,38 @@ test_mulhi_impl!(
     ]
 );
 
+#[cube(launch_unchecked)]
+fn test_dot4_i8_packed_kernel(lhs: &Array<u32>, rhs: &Array<u32>, output: &mut Array<i32>) {
+    if ABSOLUTE_POS < rhs.len() {
+        output[ABSOLUTE_POS] = dot4_i8_packed(lhs[ABSOLUTE_POS], rhs[ABSOLUTE_POS]);
+    }
+}
+
+pub fn test_dot4_i8_packed<R: Runtime>(client: ComputeClient<R>) {
+    let lhs = &[0x0403_0201, 0x807f_feff, 0xff7f_8000, 0x8080_8080];
+    let rhs = &[0x0807_0605, 0xffff_0201, 0x7f01_ff80, 0x0101_0101];
+    let expected = &[70, -4, 128, -512];
+    let output_handle = client.empty(expected.len() * core::mem::size_of::<i32>());
+    let lhs_handle = client.create_from_slice(u32::as_bytes(lhs));
+    let rhs_handle = client.create_from_slice(u32::as_bytes(rhs));
+
+    unsafe {
+        test_dot4_i8_packed_kernel::launch_unchecked::<R>(
+            &client,
+            CubeCount::Static(1, 1, 1),
+            CubeDim::new_1d(lhs.len() as u32),
+            ArrayArg::from_raw_parts(lhs_handle, lhs.len()),
+            ArrayArg::from_raw_parts(rhs_handle, rhs.len()),
+            ArrayArg::from_raw_parts(output_handle.clone(), expected.len()),
+        )
+    };
+
+    let actual = client.read_one_unchecked(output_handle);
+    let actual = i32::from_bytes(&actual);
+
+    assert_eq!(actual, expected);
+}
+
 #[allow(missing_docs)]
 #[macro_export]
 macro_rules! testgen_binary {
@@ -451,6 +483,7 @@ macro_rules! testgen_binary_untyped {
             }
 
             add_test!(test_mulhi);
+            add_test!(test_dot4_i8_packed);
         }
     };
 }

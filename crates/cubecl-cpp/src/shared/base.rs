@@ -1432,6 +1432,9 @@ impl<D: Dialect> CppCompiler<D> {
             gpu::Arithmetic::Dot(op) => {
                 instructions.push(Instruction::Dot(self.compile_binary(op, out)))
             }
+            gpu::Arithmetic::Dot4I8Packed(op) => {
+                instructions.push(Instruction::Dot4I8Packed(self.compile_binary(op, out)))
+            }
             gpu::Arithmetic::VectorSum(op) => {
                 instructions.push(Instruction::VectorSum(self.compile_unary(op, out)))
             }

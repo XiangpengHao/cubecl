@@ -11,6 +11,23 @@ use tracel_llvm::mlir_rs::{
 use crate::compiler::visitor::prelude::*;
 
 impl<'a> Visitor<'a> {
+    fn extract_dot4_i8_lane(
+        &mut self,
+        packed: Value<'a, 'a>,
+        packed_ty: ir::Type,
+        lane: u32,
+    ) -> Value<'a, 'a> {
+        let left_shift = 24 - lane * 8;
+        let shifted = if left_shift == 0 {
+            packed
+        } else {
+            let shift = self.create_int_constant_from_item(packed_ty, left_shift as i64);
+            self.append_operation_with_result(arith::shli(packed, shift, self.location))
+        };
+        let shift = self.create_int_constant_from_item(packed_ty, 24);
+        self.append_operation_with_result(arith::shrsi(shifted, shift, self.location))
+    }
+
     pub fn visit_arithmetic(&mut self, arithmetic: &Arithmetic, out: Variable) {
         match arithmetic {
             Arithmetic::Abs(abs) => {
@@ -197,6 +214,25 @@ impl<'a> Visitor<'a> {
                     arith::divf(lhs, rhs, self.location)
                 };
                 let result = self.append_operation_with_result(operation);
+                self.insert_variable(out, result);
+            }
+            Arithmetic::Dot4I8Packed(dot) => {
+                let lhs = self.get_variable(dot.lhs);
+                let rhs = self.get_variable(dot.rhs);
+                let mut result = self.create_int_constant_from_item(out.ty, 0);
+
+                for lane in 0..4 {
+                    let lhs = self.extract_dot4_i8_lane(lhs, dot.lhs.ty, lane);
+                    let rhs = self.extract_dot4_i8_lane(rhs, dot.rhs.ty, lane);
+                    let product =
+                        self.append_operation_with_result(arith::muli(lhs, rhs, self.location));
+                    result = self.append_operation_with_result(arith::addi(
+                        result,
+                        product,
+                        self.location,
+                    ));
+                }
+
                 self.insert_variable(out, result);
             }
             Arithmetic::Dot(dot) => {
