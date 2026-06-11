@@ -421,6 +421,11 @@ pub enum Instruction {
         rhs: Variable,
         out: Variable,
     },
+    Dot4I8Packed {
+        lhs: Variable,
+        rhs: Variable,
+        out: Variable,
+    },
     VectorSum {
         input: Variable,
         out: Variable,
@@ -1114,6 +1119,10 @@ for (var {i}: {i_ty} = {start}; {i} {cmp} {end}; {increment}) {{
                 } else {
                     writeln!(f, "{out} = dot({lhs}, {rhs});")
                 }
+            }
+            Instruction::Dot4I8Packed { lhs, rhs, out } => {
+                let out = out.fmt_left();
+                writeln!(f, "{out} = dot4I8Packed({lhs}, {rhs});")
             }
             Instruction::VectorSum { input, out } => {
                 let vec_size = input.item().vectorization_factor();

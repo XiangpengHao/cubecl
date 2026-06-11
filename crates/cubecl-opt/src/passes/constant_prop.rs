@@ -390,6 +390,8 @@ fn try_const_eval_arithmetic(op: &mut Arithmetic) -> Option<ConstantValue> {
             }
         }
         Arithmetic::Dot(op) => const_eval!(*op.lhs, op.rhs),
+        // Lane-packed semantics; a scalar const-eval would be wrong. Never fold.
+        Arithmetic::Dot4I8Packed(_) => None,
 
         Arithmetic::Abs(op) => {
             use ConstantValue::*;

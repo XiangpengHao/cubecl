@@ -51,6 +51,7 @@ pub struct WgslCompiler {
     strategy: ExecutionMode,
     subgroup_instructions_used: bool,
     f16_used: bool,
+    dot4_packed_used: bool,
 }
 
 impl core::fmt::Debug for WgslCompiler {
@@ -175,6 +176,7 @@ impl WgslCompiler {
             workgroup_size_no_axis: self.workgroup_size_no_axis,
             subgroup_instructions_used: self.subgroup_instructions_used,
             f16_used: self.f16_used,
+            dot4_packed_used: self.dot4_packed_used,
             kernel_name: value.options.kernel_name,
         })
     }
@@ -979,6 +981,14 @@ impl WgslCompiler {
                 rhs: self.compile_variable(op.rhs),
                 out: self.compile_variable(out),
             }),
+            cube::Arithmetic::Dot4I8Packed(op) => {
+                self.dot4_packed_used = true;
+                instructions.push(wgsl::Instruction::Dot4I8Packed {
+                    lhs: self.compile_variable(op.lhs),
+                    rhs: self.compile_variable(op.rhs),
+                    out: self.compile_variable(out),
+                })
+            }
             cube::Arithmetic::VectorSum(op) => instructions.push(wgsl::Instruction::VectorSum {
                 input: self.compile_variable(op.input),
                 out: self.compile_variable(out),

@@ -62,6 +62,10 @@ pub enum Arithmetic {
     Normalize(UnaryOperator),
     #[operation(commutative)]
     Dot(BinaryOperator),
+    /// Packed 4×i8 dot product: each `u32` operand holds four `i8` lanes;
+    /// the output is the `i32` sum of the lane-wise products (dp4a).
+    #[operation(commutative)]
+    Dot4I8Packed(BinaryOperator),
     #[operation(commutative)]
     MulHi(BinaryOperator),
     VectorSum(UnaryOperator),
@@ -119,6 +123,9 @@ impl Display for Arithmetic {
             Arithmetic::Magnitude(op) => write!(f, "{}.length()", op.input),
             Arithmetic::Normalize(op) => write!(f, "{}.normalize()", op.input),
             Arithmetic::Dot(op) => write!(f, "{}.dot({})", op.lhs, op.rhs),
+            Arithmetic::Dot4I8Packed(op) => {
+                write!(f, "dot4_i8_packed({}, {})", op.lhs, op.rhs)
+            }
             Arithmetic::MulHi(op) => write!(f, "mul_hi({}, {})", op.lhs, op.rhs),
             Arithmetic::VectorSum(op) => write!(f, "{}.vector_sum()", op.input),
         }

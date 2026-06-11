@@ -104,6 +104,7 @@ impl Optimizer {
             | Arithmetic::Min(binary_operator)
             | Arithmetic::Remainder(binary_operator)
             | Arithmetic::Dot(binary_operator)
+            | Arithmetic::Dot4I8Packed(binary_operator)
             | Arithmetic::MulHi(binary_operator)
             | Arithmetic::ArcTan2(binary_operator) => self.visit_binop(binary_operator, visit_read),
 

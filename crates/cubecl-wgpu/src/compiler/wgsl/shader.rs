@@ -104,6 +104,7 @@ pub struct ComputeShader {
     pub kernel_name: String,
     pub subgroup_instructions_used: bool,
     pub f16_used: bool,
+    pub dot4_packed_used: bool,
 }
 
 impl ComputeShader {
@@ -127,6 +128,10 @@ impl Display for ComputeShader {
 
         if self.f16_used {
             f.write_str("enable f16;")?;
+        }
+
+        if self.dot4_packed_used {
+            f.write_str("requires packed_4x8_integer_dot_product;")?;
         }
 
         Self::format_bindings(f, "buffer", &self.buffers, 0)?;

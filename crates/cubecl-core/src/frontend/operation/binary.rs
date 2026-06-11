@@ -687,3 +687,39 @@ impl_binary_func_mixed_types!(
     usize,
     isize
 );
+
+/// Packed 4×i8 dot product (one `dp4a`-class instruction where supported):
+/// interprets each `u32` operand as four packed `i8` lanes and returns the
+/// `i32` sum of the lane-wise products. Maps to WGSL `dot4I8Packed`.
+#[allow(unused_variables)]
+pub fn dot4_i8_packed(lhs: u32, rhs: u32) -> i32 {
+    unexpanded!()
+}
+
+/// Module containing the expand function for [`dot4_i8_packed()`].
+pub mod dot4_i8_packed {
+    use super::*;
+    use crate::ir::{BinaryOperator, ElemType, Instruction, IntKind, Type};
+
+    /// Expand method of [`dot4_i8_packed()`].
+    pub fn expand(
+        scope: &mut Scope,
+        lhs: NativeExpand<u32>,
+        rhs: NativeExpand<u32>,
+    ) -> NativeExpand<i32> {
+        let lhs: ManagedVariable = lhs.into();
+        let rhs: ManagedVariable = rhs.into();
+        let output = scope.create_local(Type::scalar(ElemType::Int(IntKind::I32)));
+        let out = *output;
+
+        scope.register(Instruction::new(
+            Arithmetic::Dot4I8Packed(BinaryOperator {
+                lhs: *lhs,
+                rhs: *rhs,
+            }),
+            out,
+        ));
+
+        output.into()
+    }
+}
